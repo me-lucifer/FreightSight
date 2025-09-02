@@ -1,7 +1,8 @@
+
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Email, DetectedFields, InteractionType } from "./data";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCcw, Send, Sparkles } from "lucide-react";
+import type { LogStatus } from "../extraction-log/data";
 
 type Filter = "All" | "Detected" | "Undetected" | "Low Confidence";
 
@@ -46,25 +48,32 @@ const HighlightedBody = ({
       fields.targetPrice,
       fields.pickupDate,
       fields.deliveryDate,
-    ].filter(Boolean);
+    ].filter(Boolean).filter(s => s !== "N/A");
+    
+    if (highlights.length === 0) {
+        return [body];
+    }
+
     const regex = new RegExp(`(${highlights.join("|")})`, "gi");
     return body.split(regex);
   }, [body, fields]);
 
+  const allHighlights = [
+      fields.originCity,
+      fields.originState,
+      fields.destinationCity,
+      fields.destinationState,
+      fields.equipment,
+      fields.weight,
+      fields.targetPrice,
+      fields.pickupDate,
+      fields.deliveryDate,
+    ];
+
   return (
     <p className="whitespace-pre-wrap">
       {parts.map((part, i) =>
-        [
-          fields.originCity,
-          fields.originState,
-          fields.destinationCity,
-          fields.destinationState,
-          fields.equipment,
-          fields.weight,
-          fields.targetPrice,
-          fields.pickupDate,
-          fields.deliveryDate,
-        ].includes(part) ? (
+        part && allHighlights.find(h => h?.toLowerCase() === part.toLowerCase()) ? (
           <span
             key={i}
             className="underline decoration-wavy decoration-teal-500/50"
@@ -87,9 +96,21 @@ export function InboxInspectorClient({
   detectedFields: Record<string, DetectedFields>;
 }) {
   const router = useRouter();
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(allEmails[0]);
+  const searchParams = useSearchParams();
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [detectedFields, setDetectedFields] = useState(allDetectedFields);
+
+  useEffect(() => {
+    const emailId = searchParams.get("emailId");
+    if (emailId) {
+      const emailToSelect = allEmails.find((e) => detectedFields[e.id]?.messageId === emailId);
+      setSelectedEmail(emailToSelect || allEmails[0]);
+    } else {
+        setSelectedEmail(allEmails[0]);
+    }
+  }, [searchParams, allEmails, detectedFields]);
+
 
   const filteredEmails = useMemo(() => {
     if (activeFilter === "Detected") {
@@ -99,7 +120,7 @@ export function InboxInspectorClient({
         return allEmails.filter((e) => !detectedFields[e.id] || detectedFields[e.id]?.confidence < 50);
     }
     if (activeFilter === "Low Confidence") {
-        return allEmails.filter((e) => detectedFields[e.id]?.confidence < 80 && detectedFields[e.id]?.confidence >= 50);
+        return allEmails.filter((e) => detectedFields[e.id] && detectedFields[e.id]?.confidence < 80 && detectedFields[e.id]?.confidence >= 50);
     }
     return allEmails;
   }, [activeFilter, allEmails, detectedFields]);
@@ -121,14 +142,11 @@ export function InboxInspectorClient({
   };
 
   const handleLogToSystem = () => {
-    if (!currentFields) return;
-    // In a real app, this would use global state or an API call.
-    // For this mock, we'll use localStorage and navigate.
+    if (!currentFields || !selectedEmail) return;
     const logEntry = {
       ...currentFields,
       timestamp: new Date().toISOString(),
-      source: selectedEmail?.sender,
-      status: "Logged",
+      status: "Logged" as LogStatus,
     };
     localStorage.setItem("latestLog", JSON.stringify(logEntry));
     router.push("/extraction-log");
@@ -196,7 +214,7 @@ export function InboxInspectorClient({
 
       {/* Middle Pane: Email Preview */}
       <Card className="col-span-10 lg:col-span-5">
-        {selectedEmail && currentFields ? (
+        {selectedEmail ? (
           <div className="flex h-full flex-col">
             <CardHeader>
               <CardTitle>{selectedEmail.subject}</CardTitle>
@@ -222,10 +240,14 @@ export function InboxInspectorClient({
                   value="formatted"
                   className="mt-4 flex-1 overflow-y-auto"
                 >
-                  <HighlightedBody
-                    body={selectedEmail.body}
-                    fields={currentFields}
-                  />
+                    {currentFields ? (
+                        <HighlightedBody
+                            body={selectedEmail.body}
+                            fields={currentFields}
+                        />
+                    ) : (
+                        <p className="whitespace-pre-wrap">{selectedEmail.body}</p>
+                    )}
                 </TabsContent>
                 <TabsContent
                   value="raw"
@@ -264,7 +286,7 @@ export function InboxInspectorClient({
                 <Select
                   value={currentFields.interactionType}
                   onValueChange={(value) =>
-                    handleFieldChange("interactionType", value)
+                    handleFieldChange("interactionType", value as InteractionType)
                   }
                 >
                   <SelectTrigger>
@@ -344,7 +366,7 @@ export function InboxInspectorClient({
               </p>
               <div className="flex items-center gap-2">
                 <Label>Confidence:</Label>
-                <Badge>{currentFields.confidence}%</Badge>
+                <Badge variant={currentFields.confidence > 80 ? 'default' : currentFields.confidence > 50 ? 'secondary' : 'destructive'}>{currentFields.confidence}%</Badge>
               </div>
               <div className="mt-6 flex flex-col gap-2">
                 <Button onClick={handleReclassify}>
@@ -360,8 +382,8 @@ export function InboxInspectorClient({
             </>
           ) : (
             <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
-                <p className="text-muted-foreground">
-                    No fields detected.
+                <p className="text-center text-muted-foreground">
+                    {selectedEmail ? 'No fields detected for this email.' : 'Select an email to see detected fields.'}
                 </p>
             </div>
           )}
