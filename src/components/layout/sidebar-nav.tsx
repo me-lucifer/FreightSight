@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -73,25 +74,19 @@ export function SidebarNav() {
             <CollapsibleContent asChild>
                 <SidebarMenuSub>
                     <SidebarMenuSubItem>
-                        <Link href="/settings/destinations">
-                            <SidebarMenuSubButton isActive={pathname === '/settings/destinations'}>
-                            Destinations
-                            </SidebarMenuSubButton>
-                        </Link>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/settings/destinations'}>
+                          <Link href="/settings/destinations">Destinations</Link>
+                        </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                        <Link href="/settings/field-mapping">
-                            <SidebarMenuSubButton isActive={pathname === '/settings/field-mapping'}>
-                            Field Mapping
-                            </SidebarMenuSubButton>
-                        </Link>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/settings/field-mapping'}>
+                          <Link href="/settings/field-mapping">Field Mapping</Link>
+                        </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
-                        <Link href="/settings/labels">
-                            <SidebarMenuSubButton isActive={pathname === '/settings/labels'}>
-                            Labels
-                            </SidebarMenuSubButton>
-                        </Link>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/settings/labels'}>
+                           <Link href="/settings/labels">Labels</Link>
+                        </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                 </SidebarMenuSub>
             </CollapsibleContent>
